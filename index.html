@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kviz IOZ FBiH</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Kviz – Ispit općeg znanja FBiH</h1>
+    <span class="badge">DEMO</span>
+  </header>
+
+  <main>
+    <!-- POSTAVKE -->
+    <section id="screen-setup" class="screen">
+      <div class="notice">
+        <strong>Napomena:</strong> Pitanja su preuzeta iz Kataloga pitanja Agencije za državnu službu FBiH.
+        Agencija ne objavljuje ponuđene ni tačne odgovore – odgovori i objašnjenja u ovom kvizu pripremljeni su
+        za učenje na osnovu propisa i mogu sadržavati greške ili zastarjele podatke. Provjerite ih u važećim propisima.
+        <br>Pitanja označena sa <span class="src src-ok">✓ provjereno u izvoru</span> provjerena su prema tekstu propisa
+        (<strong id="verified-count">0</strong> pitanja). Ostala su označena sa <span class="src src-no">⚠ nije provjereno</span>.
+      </div>
+
+      <div class="card">
+        <h2>Oblasti</h2>
+        <p class="muted">Ukupno pitanja u bazi: <strong id="total-count">0</strong></p>
+        <div id="area-list" class="area-list"></div>
+        <div class="row small-gap">
+          <button type="button" class="btn ghost" id="areas-all">Označi sve</button>
+          <button type="button" class="btn ghost" id="areas-none">Poništi sve</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Izbor pitanja</h2>
+        <label class="radio"><input type="radio" name="mode" value="range" checked> Redom – od pitanja do pitanja (učenje u kontinuitetu)</label>
+        <label class="radio"><input type="radio" name="mode" value="random"> Nasumično – izabrani broj pitanja iz raspona</label>
+        <label class="radio"><input type="radio" name="mode" value="exam"> Simulacija ispita – 42 nasumična pitanja, 60 minuta, prolaz 28</label>
+
+        <div class="row" id="range-fields">
+          <label>Od pitanja br. <input type="number" id="from" min="1" value="1"></label>
+          <label>Do pitanja br. <input type="number" id="to" min="1" value="20"></label>
+        </div>
+        <div class="row" id="count-field" hidden>
+          <label>Broj pitanja <input type="number" id="count" min="1" value="20"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="only-verified"> Samo pitanja provjerena u izvoru</label>
+        <p class="muted" id="range-info"></p>
+        <button type="button" class="btn ghost" id="continue-btn" hidden></button>
+      </div>
+
+      <div class="card">
+        <h2>Prikaz odgovora</h2>
+        <label class="radio"><input type="radio" name="feedback" value="instant" checked> Odmah nakon svakog pitanja</label>
+        <label class="radio"><input type="radio" name="feedback" value="end"> Tek na kraju testa</label>
+        <label class="check"><input type="checkbox" id="shuffle-answers"> Promiješaj redoslijed ponuđenih odgovora</label>
+      </div>
+
+      <p class="error" id="setup-error"></p>
+      <button type="button" class="btn primary big" id="start-btn">Započni kviz</button>
+    </section>
+
+    <!-- KVIZ -->
+    <section id="screen-quiz" class="screen" hidden>
+      <div class="quiz-head">
+        <span id="q-progress"></span>
+        <span id="q-timer" class="timer" hidden></span>
+      </div>
+      <div class="progress"><div id="q-bar"></div></div>
+
+      <div class="card question-card">
+        <div class="q-meta"><span id="q-number" class="q-number"></span><span id="q-area" class="muted"></span><span id="q-src" class="src"></span></div>
+        <h2 id="q-text"></h2>
+        <div id="q-answers" class="answers"></div>
+        <div id="q-explain" class="explain" hidden></div>
+      </div>
+
+      <div class="row nav">
+        <button type="button" class="btn ghost" id="prev-btn">← Prethodno</button>
+        <button type="button" class="btn primary" id="next-btn">Sljedeće →</button>
+      </div>
+      <div class="row nav">
+        <button type="button" class="btn ghost" id="quit-btn">Prekini</button>
+        <button type="button" class="btn danger" id="finish-btn">Završi test</button>
+      </div>
+      <div id="q-grid" class="q-grid"></div>
+    </section>
+
+    <!-- REZULTATI -->
+    <section id="screen-result" class="screen" hidden>
+      <div class="card result-card">
+        <div id="r-status" class="r-status"></div>
+        <div id="r-score" class="r-score"></div>
+        <div id="r-detail" class="muted"></div>
+      </div>
+      <div class="row">
+        <button type="button" class="btn primary" id="retry-wrong-btn">Ponovi samo netačna</button>
+        <button type="button" class="btn ghost" id="next-range-btn" hidden></button>
+        <button type="button" class="btn ghost" id="home-btn">Nove postavke</button>
+      </div>
+      <h2 class="review-title">Pregled odgovora</h2>
+      <label class="check"><input type="checkbox" id="only-wrong"> Prikaži samo netačne</label>
+      <div id="r-review"></div>
+    </section>
+  </main>
+
+  <script>
+    // Svaki data fajl poziva dodajPitanja(oblast, [[pitanje, [A, B, C], indeksTacnog, objasnjenje, provjereno (1/0)], ...]).
+    // Redni broj (id) se dodjeljuje redom učitavanja, kroz sve oblasti.
+    window.PITANJA = [];
+    window.dodajPitanja = function (oblast, lista) {
+      lista.forEach(function (q) {
+        window.PITANJA.push({
+          id: window.PITANJA.length + 1,
+          oblast: oblast,
+          pitanje: q[0],
+          odgovori: q[1],
+          tacan: q[2],
+          objasnjenje: q[3] || "",
+          provjereno: q[4] === 1
+        });
+      });
+    };
+  </script>
+  <script src="data/pitanja-1-ustavni-sistem.js"></script>
+  <script src="data/pitanja-2-organizacija-uprave.js"></script>
+  <script src="data/pitanja-3-upravni-postupak.js"></script>
+  <script src="data/pitanja-4-radni-odnosi.js"></script>
+  <script src="data/pitanja-5-kancelarijsko-poslovanje.js"></script>
+  <script src="data/pitanja-6-evropske-integracije.js"></script>
+  <script src="data/primjer-testa.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
