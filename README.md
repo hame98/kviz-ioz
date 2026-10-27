@@ -6,6 +6,9 @@ Sadrži sva pitanja iz „Kataloga pitanja – Vodič za polaganje ispita općeg
 ## Pokretanje
 Otvorite `index.html` duplim klikom. Ne treba ni internet ni instalacija.
 
+## Izgled
+Gore je meni s ekranima **Učenje** (postavke testa u 4 koraka i stalno vidljiv sažetak), **Pretraga** i **Simulacija ispita**, te polje za brzu pretragu (tipka `/`). Tokom testa desno je panel „Izvori i dokazi“, a slika stranice skripte se uvećava klikom. Interfejs prati svijetlu ili tamnu temu sistema i prilagođen je mobitelu.
+
 ## Mogućnosti
 - **Redom (od–do):** svako pitanje ima redni broj (#1–#1641; pitanja iz skripte su #1110–#1641). Unesite raspon, npr. 1–20. Na kraju testa dugme „Sljedeći raspon“ nastavlja dalje, a kviz pamti dokle ste stigli.
 - **Nasumično:** zadani broj pitanja, nasumično iz odabranog raspona.

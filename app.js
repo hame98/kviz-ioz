@@ -8,8 +8,9 @@
   var EXAM_SECONDS = 60 * 60;
   var STORE_KEY = "kviz-ioz-fbih-v1";
   var SKRIPTA_OBLAST = "Pitanja s ispita (skripta 2025)";
+  var SEARCH_LIMIT = 30;
 
-  // Dokazi iz skripti (data/izvori-skripte.js): ključ je tekst pitanja.
+  // Dokazi iz skripti i s weba (data/izvori-skripte.js): ključ je tekst pitanja.
   var DOKUMENTI = window.SKRIPTE_DOKUMENTI || [];
   var IZVORI = window.IZVORI_SKRIPTE || {};
   var WEB_DOK = window.WEB_DOKUMENT || null;
@@ -22,6 +23,9 @@
   var $ = function (id) { return document.getElementById(id); };
   var session = null;
   var timerHandle = null;
+  var reviewOnlyWrong = false;
+  var searchIzvor = "sve";
+  var lastFocus = null;
 
   // ---------- pohrana (per-browser, opcionalno) ----------
   function loadStore() {
@@ -44,55 +48,12 @@
     }
     return a;
   }
-  function srcBadge(q) {
-    return q.provjereno
-      ? '<span class="src src-ok" title="Odgovor je provjeren prema tekstu propisa">✓ provjereno u izvoru</span>'
-      : '<span class="src src-no" title="Odgovor nije provjeren prema tekstu propisa – provjerite ga sami">⚠ nije provjereno</span>';
-  }
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
   }
-  function evidenceHtml(q) {
-    if (!q.izvori.length) return "";
-    var html = '<div class="evidence"><strong>📄 Dokaz iz skripte</strong>';
-    q.izvori.forEach(function (e) {
-      var d = DOKUMENTI[e[0]];
-      var img = encodeURI(d.slike + e[1] + ".jpg");
-      html += '<div class="ev-item">' +
-        "<div><strong>" + esc(d.naziv) + "</strong>, str. " + e[1] +
-        ' · <a href="' + encodeURI(d.pdf) + "#page=" + e[1] + '" target="_blank" rel="noopener">otvori PDF</a>' +
-        ' · <a href="' + img + '" target="_blank" rel="noopener">slika u novom prozoru</a></div>' +
-        (e[2] !== q.pitanje ? '<div class="muted">Pitanje u skripti: ' + esc(e[2]) + "</div>" : "") +
-        "<div>Odgovor u skripti: <em>" + esc(e[3]) + "</em></div>" +
-        '<details><summary>Prikaži stranicu</summary><img loading="lazy" src="' + img + '" alt="' +
-        esc(d.naziv) + ", str. " + e[1] + '"></details>' +
-        "</div>";
-    });
-    return html + "</div>";
-  }
-  function webEvidenceHtml(q) {
-    if (!q.web || !WEB_DOK) return "";
-    var page = q.web[0];
-    return '<div class="evidence"><strong>🌐 Dokaz s weba</strong><div class="ev-item">' +
-      "<div><strong>" + esc(WEB_DOK.naziv) + "</strong>, str. " + page +
-      ' · <a href="' + encodeURI(WEB_DOK.pdf) + "#page=" + page + '" target="_blank" rel="noopener">otvori PDF</a>' +
-      ' · <a href="' + WEB_DOK.url + '" target="_blank" rel="noopener">sajt Agencije</a></div>' +
-      '<div class="muted">Pitanje u katalogu: ' + esc(q.web[1]) + "</div>" +
-      (q.oblast.indexOf("Primjer testa") === 0 ? "" :
-        '<div class="muted">Agencija objavljuje samo pitanja, bez odgovora. Odgovor je iz kviza (vidi objašnjenje).</div>') +
-      "</div></div>";
-  }
-  function izvorOk(q, izvor) {
-    if (izvor === "web") return q.oblast !== SKRIPTA_OBLAST;
-    if (izvor === "skripta") return q.izvori.length > 0;
-    return true;
-  }
-  function show(screen) {
-    ["setup", "quiz", "result"].forEach(function (n) { $("screen-" + n).hidden = n !== screen; });
-    window.scrollTo(0, 0);
-  }
+  function fmt(n) { return n.toLocaleString("de-DE"); }
   function radioValue(name) {
     var el = document.querySelector('input[name="' + name + '"]:checked');
     return el ? el.value : null;
@@ -100,6 +61,95 @@
   function setRadio(name, value) {
     var el = document.querySelector('input[name="' + name + '"][value="' + value + '"]');
     if (el) el.checked = true;
+  }
+  function isWeb(q) { return q.oblast !== SKRIPTA_OBLAST; }
+  function izvorOk(q, izvor) {
+    if (izvor === "web") return isWeb(q);
+    if (izvor === "skripta") return q.izvori.length > 0;
+    return true;
+  }
+  var ICON_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+  var ICON_X = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
+  var ICON_OK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+  function verifiedChip(q) {
+    return q.provjereno
+      ? '<span class="chip chip-ok" title="Odgovor je provjeren prema tekstu propisa">provjereno</span>'
+      : '<span class="chip chip-warn" title="Odgovor nije provjeren prema tekstu propisa – provjerite ga sami">nije provjereno</span>';
+  }
+  function sourceChips(q) {
+    return (isWeb(q) ? '<span class="chip chip-web">Web</span>' : "") +
+      (q.izvori.length ? '<span class="chip chip-skripta">Skripta</span>' : "");
+  }
+  function evidenceCount(q) { return (q.web && WEB_DOK ? 1 : 0) + q.izvori.length; }
+
+  // ---------- dokazi ----------
+  function webCard(q) {
+    if (!q.web || !WEB_DOK) return "";
+    var page = q.web[0];
+    return '<section class="ev-card"><div class="ev-body">' +
+      '<div class="ev-head"><span class="badge badge-web">WEB</span><span class="ev-title">Katalog pitanja ADS FBiH · str. ' + page + "</span></div>" +
+      "<p>Pitanje u katalogu: „" + esc(q.web[1]) + "“" +
+      (q.oblast.indexOf("Primjer testa") === 0 ? "" : " Agencija objavljuje samo pitanja, bez odgovora.") + "</p>" +
+      '<div class="ev-actions">' +
+      '<a class="btn" href="' + encodeURI(WEB_DOK.pdf) + "#page=" + page + '" target="_blank" rel="noopener">Otvori PDF</a>' +
+      '<a class="btn" href="' + WEB_DOK.url + '" target="_blank" rel="noopener">Sajt Agencije</a>' +
+      "</div></div></section>";
+  }
+  function scriptCards(q) {
+    return q.izvori.map(function (e) {
+      var d = DOKUMENTI[e[0]];
+      var img = encodeURI(d.slike + e[1] + ".jpg");
+      var cap = d.naziv + ", str. " + e[1];
+      return '<section class="ev-card">' +
+        '<button type="button" class="ev-thumb" data-zoom="' + img + '" data-cap="' + esc(cap) + '" aria-label="Uvećaj stranicu: ' + esc(cap) + '">' +
+        '<img loading="lazy" src="' + img + '" alt=""></button>' +
+        '<div class="ev-body">' +
+        '<div class="ev-head"><span class="badge badge-skripta">SKRIPTA</span><span class="ev-title">' + esc(d.naziv) + " · str. " + e[1] + "</span></div>" +
+        (e[2] !== q.pitanje ? "<p>Pitanje u skripti: " + esc(e[2]) + "</p>" : "") +
+        '<p class="ev-answer">Odgovor u skripti: <strong>' + esc(e[3]) + "</strong></p>" +
+        '<div class="ev-actions">' +
+        '<button type="button" class="btn" data-zoom="' + img + '" data-cap="' + esc(cap) + '">Uvećaj stranicu</button>' +
+        '<a class="btn" href="' + encodeURI(d.pdf) + "#page=" + e[1] + '" target="_blank" rel="noopener">Otvori PDF</a>' +
+        "</div></div></section>";
+    }).join("");
+  }
+  function evidenceDetails(q, open) {
+    var n = evidenceCount(q);
+    if (!n) return "";
+    return '<details class="ev-details"' + (open ? " open" : "") + "><summary>Dokazi (" + n + ")</summary>" +
+      '<div class="ev-grid">' + webCard(q) + scriptCards(q) + "</div></details>";
+  }
+
+  // ---------- uvećana stranica ----------
+  function openZoom(src, cap) {
+    lastFocus = document.activeElement;
+    $("lb-img").src = src;
+    $("lb-img").alt = cap;
+    $("lb-cap").textContent = cap;
+    $("lb-open").href = src;
+    $("lightbox").hidden = false;
+    $("lb-close").focus();
+  }
+  function closeZoom() {
+    $("lightbox").hidden = true;
+    $("lb-img").src = "";
+    if (lastFocus) lastFocus.focus();
+  }
+
+  // ---------- ekrani ----------
+  function show(screen) {
+    ["setup", "search", "quiz", "result"].forEach(function (n) { $("screen-" + n).hidden = n !== screen; });
+    $("topbar").hidden = screen === "quiz";
+    updateNav(screen);
+    window.scrollTo(0, 0);
+  }
+  function updateNav(screen) {
+    var active = screen === "setup" && radioValue("mode") === "exam" ? "exam" : screen;
+    document.querySelectorAll(".mainnav button").forEach(function (b) {
+      if (b.getAttribute("data-nav") === active) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
   }
 
   // ---------- oblasti ----------
@@ -115,31 +165,28 @@
   }
   function selectedAreas() {
     return Array.prototype.map.call(
-      document.querySelectorAll('#area-list input:checked'),
+      document.querySelectorAll("#area-list input:checked"),
       function (el) { return el.value; }
     );
   }
 
   // ---------- postavke ----------
   function renderSetup() {
-    $("total-count").textContent = ALL.length;
-    $("verified-count").textContent = ALL.filter(function (q) { return q.provjereno; }).length;
-    ["sve", "web", "skripta"].forEach(function (iz) {
-      $("cnt-" + iz).textContent = ALL.filter(function (q) { return izvorOk(q, iz); }).length;
-    });
+    var count = function (iz) { return ALL.filter(function (q) { return izvorOk(q, iz); }).length; };
+    $("total-count").textContent = fmt(ALL.length);
+    $("verified-count").textContent = fmt(ALL.filter(function (q) { return q.provjereno; }).length);
+    $("stat-skripta").textContent = fmt(count("skripta"));
+    $("stat-web").textContent = fmt(count("web"));
+    ["sve", "web", "skripta"].forEach(function (iz) { $("cnt-" + iz).textContent = fmt(count(iz)); });
+
     var store = loadStore();
     var saved = store.settings || {};
-    var list = $("area-list");
-    list.innerHTML = "";
-    areas().forEach(function (a) {
+    $("area-list").innerHTML = areas().map(function (a) {
       var checked = saved.areas ? saved.areas.indexOf(a.name) !== -1 : true;
-      var label = document.createElement("label");
-      label.innerHTML =
-        '<span><input type="checkbox" value="' + esc(a.name) + '"' + (checked ? " checked" : "") + "> " +
-        esc(a.name) + " (" + a.n + ")</span>" +
-        '<span class="ids">#' + a.min + "–#" + a.max + "</span>";
-      list.appendChild(label);
-    });
+      return '<label class="area-card"><input type="checkbox" value="' + esc(a.name) + '"' + (checked ? " checked" : "") + ">" +
+        '<span><span class="area-name">' + esc(a.name) + '</span><span class="area-meta">' + fmt(a.n) +
+        " pitanja · #" + a.min + "–#" + a.max + "</span></span></label>";
+    }).join("");
 
     $("to").max = $("from").max = ALL.length;
     if (saved.mode) setRadio("mode", saved.mode);
@@ -157,11 +204,13 @@
       var nf = store.lastTo + 1;
       var nt = Math.min(ALL.length, nf + span - 1);
       cont.hidden = false;
-      cont.textContent = "Nastavi učenje: pitanja #" + nf + "–#" + nt;
+      $("cont-range").textContent = "Pitanja #" + nf + " – #" + nt;
+      $("cont-area").textContent = ALL[nf - 1].oblast;
       cont.onclick = function () {
         setRadio("mode", "range");
         $("from").value = nf; $("to").value = nt;
         updateModeFields();
+        startFromSetup();
       };
     } else {
       cont.hidden = true;
@@ -173,15 +222,30 @@
     var mode = radioValue("mode");
     $("range-fields").hidden = mode === "exam";
     $("count-field").hidden = mode !== "random";
-    var info = "";
+    var pool = buildPool(mode === "exam");
+    var info, n;
     if (mode === "exam") {
+      n = Math.min(EXAM_COUNT, pool.length);
       info = "Test: " + EXAM_COUNT + " nasumičnih pitanja iz označenih oblasti, " +
         EXAM_SECONDS / 60 + " minuta, prolaz " + EXAM_PASS + "/" + EXAM_COUNT + ".";
     } else {
-      var n = buildPool(false).length;
-      info = "U odabranom rasponu i oblastima ima " + n + " pitanja.";
+      n = mode === "random" ? Math.min(parseInt($("count").value, 10) || 0, pool.length) : pool.length;
+      info = "U odabranom rasponu i oblastima ima " + fmt(pool.length) + " pitanja.";
     }
     $("range-info").textContent = info;
+
+    var from = $("from").value, to = $("to").value;
+    var izvorNames = { sve: "Sve", web: "Web", skripta: "Skripta" };
+    $("sum-count").textContent = fmt(n);
+    $("sum-izvor").textContent = izvorNames[radioValue("izvor") || "sve"];
+    $("sum-oblasti").textContent = selectedAreas().length + " od " + areas().length;
+    $("sum-nacin").textContent = mode === "exam" ? "Simulacija ispita, 60 min"
+      : mode === "random" ? "Nasumično iz #" + from + "–#" + to
+      : "Redom, #" + from + "–#" + to;
+    $("sum-odgovori").textContent = mode === "exam" ? "Na kraju (kao na ispitu)"
+      : radioValue("feedback") === "instant" ? "Odmah, s dokazom" : "Na kraju testa";
+    $("setup-error").textContent = "";
+    if (!$("screen-setup").hidden) updateNav("setup");
   }
 
   function buildPool(ignoreRange) {
@@ -248,6 +312,7 @@
       opts: opts,
       idx: 0,
       finished: false,
+      startedAt: Date.now(),
       items: questions.map(function (q) {
         var order = q.odgovori.map(function (_, i) { return i; });
         return { q: q, order: opts.shuffle ? shuffle(order) : order, chosen: null };
@@ -257,8 +322,8 @@
     if (opts.mode === "exam") startTimer(EXAM_SECONDS);
     else $("q-timer").hidden = true;
     renderGrid();
-    renderQuestion();
     show("quiz");
+    renderQuestion();
   }
 
   function startTimer(seconds) {
@@ -290,48 +355,62 @@
     var instant = session.opts.feedback === "instant";
     var locked = instant && it.chosen !== null;
 
-    $("q-progress").textContent = "Pitanje " + (session.idx + 1) + " / " + total;
+    $("q-progress").textContent = "Pitanje " + (session.idx + 1) + " od " + total;
     $("q-bar").style.width = ((session.idx + 1) / total * 100) + "%";
+    $("q-barwrap").setAttribute("aria-valuenow", session.idx + 1);
+    $("q-barwrap").setAttribute("aria-valuemax", total);
+    var answered = session.items.filter(function (x) { return x.chosen !== null; });
+    var ok = answered.filter(isCorrect).length;
+    $("q-stats").textContent = instant
+      ? ok + " tačno · " + (answered.length - ok) + " netačno"
+      : "Odgovoreno " + answered.length + " od " + total;
+
     $("q-number").textContent = "#" + q.id;
     $("q-area").textContent = q.oblast;
-    $("q-src").innerHTML = srcBadge(q);
+    $("q-src").innerHTML = verifiedChip(q) + sourceChips(q);
     $("q-text").textContent = q.pitanje;
 
-    var box = $("q-answers");
-    box.innerHTML = "";
-    it.order.forEach(function (origIdx, pos) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "answer";
-      b.innerHTML = '<span class="letter">' + LETTERS[pos] + ")</span><span>" + esc(q.odgovori[origIdx]) + "</span>";
+    $("q-answers").innerHTML = it.order.map(function (origIdx, pos) {
+      var cls = "answer", note = "";
       if (locked) {
-        b.disabled = true;
-        if (origIdx === q.tacan) b.classList.add("correct");
-        else if (origIdx === it.chosen) b.classList.add("wrong");
+        if (origIdx === q.tacan) { cls += " correct"; note = ICON_OK; }
+        else if (origIdx === it.chosen) { cls += " wrong"; note = '<span class="a-note">Vaš odgovor</span>'; }
       } else if (origIdx === it.chosen) {
-        b.classList.add("chosen");
+        cls += " chosen";
       }
-      b.onclick = function () { choose(origIdx); };
-      box.appendChild(b);
-    });
+      return '<button type="button" class="' + cls + '" data-orig="' + origIdx + '"' + (locked ? " disabled" : "") + ">" +
+        '<span class="letter">' + LETTERS[pos] + '</span><span class="a-text">' + esc(q.odgovori[origIdx]) + "</span>" + note + "</button>";
+    }).join("");
 
     var ex = $("q-explain");
     if (locked) {
-      var ok = isCorrect(it);
-      ex.hidden = false;
-      ex.className = "explain " + (ok ? "ok" : "bad");
+      var good = isCorrect(it);
       var correctPos = it.order.indexOf(q.tacan);
-      ex.innerHTML = "<strong>" + (ok ? "✓ Tačno." : "✗ Netačno. Tačan odgovor: " + LETTERS[correctPos] + ")") +
-        "</strong>" + (q.objasnjenje ? "<br>" + esc(q.objasnjenje) : "");
+      ex.hidden = false;
+      ex.className = "feedback " + (good ? "ok" : "bad");
+      ex.innerHTML = (good ? ICON_OK : ICON_X) + "<div><strong>" +
+        (good ? "Tačno!" : "Netačno – tačan odgovor je " + LETTERS[correctPos]) + "</strong>" +
+        (q.objasnjenje ? "<span>" + esc(q.objasnjenje) + "</span>" : "") + "</div>";
     } else {
       ex.hidden = true;
     }
+
+    var n = evidenceCount(q);
+    $("ev-count").textContent = n ? n + (n === 1 ? " izvor" : " izvora") : "";
     var ev = $("q-evidence");
-    ev.innerHTML = locked ? webEvidenceHtml(q) + evidenceHtml(q) : "";
-    ev.hidden = !ev.innerHTML;
+    if (locked) {
+      ev.innerHTML = webCard(q) + scriptCards(q) ||
+        '<div class="ev-placeholder">Za ovo pitanje nema dokaza iz kataloga ni iz skripti.</div>';
+    } else if (instant) {
+      ev.innerHTML = '<div class="ev-placeholder">' + (n
+        ? "Dokazi (" + n + ") pojavit će se čim odgovorite – stranica kataloga i/ili skripte sa slikom."
+        : "Za ovo pitanje nema dokaza iz kataloga ni iz skripti.") + "</div>";
+    } else {
+      ev.innerHTML = '<div class="ev-placeholder">Dokazi se prikazuju u pregledu odgovora, na kraju testa.</div>';
+    }
 
     $("prev-btn").disabled = session.idx === 0;
-    $("next-btn").textContent = session.idx === total - 1 ? "Završi →" : "Sljedeće →";
+    $("next-btn").textContent = session.idx === total - 1 ? "Završi test" : "Sljedeće";
     updateGrid();
   }
 
@@ -343,26 +422,23 @@
   }
 
   function renderGrid() {
-    var g = $("q-grid");
-    g.innerHTML = "";
-    session.items.forEach(function (_, i) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = i + 1;
-      b.onclick = function () { session.idx = i; renderQuestion(); };
-      g.appendChild(b);
-    });
+    $("q-grid").innerHTML = session.items.map(function (_, i) {
+      return '<button type="button" data-idx="' + i + '">' + (i + 1) + "</button>";
+    }).join("");
   }
   function updateGrid() {
     var instant = session.opts.feedback === "instant";
     Array.prototype.forEach.call($("q-grid").children, function (b, i) {
       var it = session.items[i];
+      var state = "bez odgovora";
       b.className = "";
       if (it.chosen !== null) {
-        if (instant) b.classList.add(isCorrect(it) ? "g-ok" : "g-bad");
-        else b.classList.add("answered");
+        if (instant) { b.classList.add(isCorrect(it) ? "g-ok" : "g-bad"); state = isCorrect(it) ? "tačno" : "netačno"; }
+        else { b.classList.add("answered"); state = "odgovoreno"; }
       }
-      if (i === session.idx) b.classList.add("current");
+      if (i === session.idx) { b.classList.add("current"); b.setAttribute("aria-current", "step"); }
+      else b.removeAttribute("aria-current");
+      b.setAttribute("aria-label", "Pitanje " + (i + 1) + ", " + state);
     });
   }
 
@@ -384,13 +460,25 @@
     var correct = items.filter(isCorrect).length;
     var total = items.length;
     var pct = Math.round(correct / total * 100);
-    var passNeeded = session.opts.mode === "exam" ? EXAM_PASS : Math.ceil(total * 2 / 3);
+    var exam = session.opts.mode === "exam";
+    var passNeeded = exam ? EXAM_PASS : Math.ceil(total * 2 / 3);
     var passed = correct >= passNeeded;
+    var minutes = Math.max(1, Math.round((Date.now() - session.startedAt) / 60000));
 
+    var ring = $("r-ring");
+    ring.style.background = "conic-gradient(var(" + (passed ? "--ok" : "--bad") + ") 0 " + pct + "%, var(--track) " + pct + "% 100%)";
+    ring.setAttribute("aria-label", correct + " od " + total + " tačno, " + pct + " posto");
+    $("r-score").textContent = correct + "/" + total;
+    $("r-pct").textContent = pct + "% tačno";
     $("r-status").textContent = passed ? "POLOŽENO" : "NIJE POLOŽENO";
-    $("r-status").className = "r-status " + (passed ? "pass" : "fail");
-    $("r-score").textContent = correct + " / " + total;
-    $("r-detail").textContent = pct + "% tačnih · potrebno za prolaz (2/3): " + passNeeded;
+    $("r-status").className = "status-pill " + (passed ? "pass" : "fail");
+    $("r-headline").textContent = exam
+      ? (passed ? "Prošli biste na stručni ispit" : "Još malo vježbe do prolaza")
+      : (passed ? "Odlično, ovaj krug je savladan" : "Ponovite netačna pitanja");
+    var diff = correct - passNeeded;
+    $("r-detail").textContent = "Za prolaz je potrebno " + passNeeded + " tačnih od " + total + ". " +
+      (diff >= 0 ? "Imali ste " + diff + " više od granice" : "Nedostaje vam još " + (-diff)) +
+      (exam ? ", za " + minutes + " min." : ".");
 
     if (session.opts.rangeTo) {
       saveStore({ lastTo: session.opts.rangeTo });
@@ -411,42 +499,62 @@
     }
 
     var wrong = items.filter(function (it) { return !isCorrect(it); });
-    $("retry-wrong-btn").disabled = !wrong.length;
-    $("retry-wrong-btn").onclick = function () {
+    var rb = $("retry-wrong-btn");
+    rb.disabled = !wrong.length;
+    rb.textContent = wrong.length ? "Ponovi " + wrong.length + " netačnih" : "Sve tačno!";
+    rb.onclick = function () {
       startSession(wrong.map(function (it) { return it.q; }), {
         mode: "retry", feedback: session.opts.feedback === "end" && session.opts.mode === "exam" ? "instant" : session.opts.feedback,
         shuffle: session.opts.shuffle, rangeTo: null
       });
     };
 
+    // po oblastima
+    var by = {}, order = [];
+    items.forEach(function (it) {
+      if (!by[it.q.oblast]) { by[it.q.oblast] = { ok: 0, n: 0 }; order.push(it.q.oblast); }
+      by[it.q.oblast].n++;
+      if (isCorrect(it)) by[it.q.oblast].ok++;
+    });
+    $("r-areas").innerHTML = order.map(function (name) {
+      var a = by[name], p = Math.round(a.ok / a.n * 100);
+      return '<div class="area-bar"><span class="name">' + esc(name) + "</span>" +
+        '<div class="track"><div class="fill' + (a.ok / a.n < 2 / 3 ? " low" : "") + '" style="width:' + p + '%"></div></div>' +
+        '<span class="score">' + a.ok + "/" + a.n + "</span></div>";
+    }).join("");
+
+    $("rv-all").textContent = "Sva · " + total;
+    $("rv-wrong").textContent = "Netačna · " + wrong.length;
+    reviewOnlyWrong = wrong.length > 0;
     renderReview();
     show("result");
   }
 
   function renderReview() {
-    var onlyWrong = $("only-wrong").checked;
+    $("rv-all").setAttribute("aria-pressed", String(!reviewOnlyWrong));
+    $("rv-wrong").setAttribute("aria-pressed", String(reviewOnlyWrong));
     var html = "";
     session.items.forEach(function (it, i) {
       var ok = isCorrect(it);
-      if (onlyWrong && ok) return;
+      if (reviewOnlyWrong && ok) return;
       var q = it.q;
-      html += '<div class="review-item' + (ok ? "" : " bad") + '">' +
-        '<div class="muted">' + (i + 1) + ". · #" + q.id + " · " + esc(q.oblast) + " " + srcBadge(q) + "</div>" +
-        '<div class="q">' + esc(q.pitanje) + "</div>";
+      html += '<article class="result-card">' +
+        '<div class="result-meta"><strong style="color:var(' + (ok ? "--ok" : "--bad") + ')">' + (ok ? "✓" : "✗") + "</strong>" +
+        "<span>Pitanje " + (i + 1) + " · #" + q.id + " · " + esc(q.oblast) + "</span>" + verifiedChip(q) + sourceChips(q) + "</div>" +
+        "<h3>" + esc(q.pitanje) + "</h3><div class=\"rv-answers\">";
       it.order.forEach(function (origIdx, pos) {
         var cls = origIdx === q.tacan ? "correct" : (origIdx === it.chosen ? "wrong" : "");
-        var mark = origIdx === it.chosen ? " ← vaš odgovor" : "";
-        html += '<div class="a ' + cls + '">' + LETTERS[pos] + ") " + esc(q.odgovori[origIdx]) + mark + "</div>";
+        var mark = origIdx === q.tacan ? " – tačno" : (origIdx === it.chosen ? " – vaš odgovor" : "");
+        html += '<span class="' + cls + '">' + LETTERS[pos] + ") " + esc(q.odgovori[origIdx]) + mark + "</span>";
       });
-      if (it.chosen === null) html += '<div class="a wrong">Bez odgovora</div>';
-      if (q.objasnjenje) html += '<div class="e">' + esc(q.objasnjenje) + "</div>";
-      html += webEvidenceHtml(q) + evidenceHtml(q) + "</div>";
+      if (it.chosen === null) html += '<span class="wrong">Bez odgovora</span>';
+      html += "</div>" + (q.objasnjenje ? '<p class="rv-expl">' + esc(q.objasnjenje) + "</p>" : "") +
+        evidenceDetails(q, false) + "</article>";
     });
-    $("r-review").innerHTML = html || '<p class="muted">Sve tačno!</p>';
+    $("r-review").innerHTML = html || '<p class="muted">Sve tačno – nema netačnih odgovora.</p>';
   }
 
   // ---------- pretraga ----------
-  var SEARCH_LIMIT = 30;
   function norm(s) {
     return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
   }
@@ -458,45 +566,81 @@
     q.traziPitanje = norm(q.pitanje);
     q.trazi = norm(q.pitanje + " " + q.odgovori.join(" ") + " " + q.izvori.map(function (e) { return e[2]; }).join(" "));
   });
-  function yesNo(yes, label) {
-    return '<span class="tag ' + (yes ? "tag-yes" : "tag-no") + '">' + label + ": " + (yes ? "DA" : "NE") + "</span>";
+  // Označava pronađene riječi u tekstu, bez obzira na kvačice (normalizacija znak po znak).
+  function highlight(text, stems) {
+    var n = "";
+    for (var i = 0; i < text.length; i++) n += norm(text[i]).charAt(0) || " ";
+    var hit = new Array(text.length);
+    stems.forEach(function (s) {
+      var at = n.indexOf(s);
+      while (at !== -1) {
+        for (var k = at; k < at + s.length; k++) hit[k] = true;
+        at = n.indexOf(s, at + s.length);
+      }
+    });
+    var out = "", open = false;
+    for (var j = 0; j < text.length; j++) {
+      if (hit[j] && !open) { out += "<mark>"; open = true; }
+      if (!hit[j] && open) { out += "</mark>"; open = false; }
+      out += esc(text[j]);
+    }
+    return out + (open ? "</mark>" : "");
   }
   function runSearch() {
     var words = norm($("search").value).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 2; }).map(stem);
     var info = $("search-info"), box = $("search-results");
-    if (!words.length) { info.textContent = ""; box.innerHTML = ""; return; }
-    var hits = ALL.filter(function (q) {
+    var oblast = $("search-oblast").value;
+    var pills = document.querySelectorAll("#search-pills .pill");
+    if (!words.length) {
+      info.textContent = "";
+      box.innerHTML = "";
+      pills.forEach(function (p) { p.textContent = { sve: "Sve", web: "Web", skripta: "Skripta" }[p.getAttribute("data-sizvor")]; });
+      return;
+    }
+    var base = ALL.filter(function (q) {
+      if (oblast && q.oblast !== oblast) return false;
       return words.every(function (w) { return q.trazi.indexOf(w) !== -1; });
     });
-    // prvo pitanja u kojima su sve riječi u samom tekstu pitanja
+    pills.forEach(function (p) {
+      var iz = p.getAttribute("data-sizvor");
+      p.textContent = { sve: "Sve", web: "Web", skripta: "Skripta" }[iz] + " · " +
+        base.filter(function (q) { return izvorOk(q, iz); }).length;
+      p.setAttribute("aria-pressed", String(iz === searchIzvor));
+    });
+    var hits = base.filter(function (q) { return izvorOk(q, searchIzvor); });
     function score(q) {
       return words.filter(function (w) { return q.traziPitanje.indexOf(w) !== -1; }).length;
     }
     hits.sort(function (a, b) { return score(b) - score(a) || a.id - b.id; });
-    info.textContent = hits.length
-      ? "Pronađeno pitanja: " + hits.length + (hits.length > SEARCH_LIMIT ? " (prikazano prvih " + SEARCH_LIMIT + " – suzite pretragu)" : "")
+    info.innerHTML = hits.length
+      ? "Pronađeno <strong>" + hits.length + "</strong> pitanja" + (hits.length > SEARCH_LIMIT ? " (prikazano prvih " + SEARCH_LIMIT + " – suzite pretragu)" : "")
       : "Nema pitanja s tim riječima.";
-    box.innerHTML = hits.slice(0, SEARCH_LIMIT).map(function (q) {
-      var naWebu = q.oblast !== SKRIPTA_OBLAST;
-      return '<div class="review-item">' +
-        '<div class="muted">#' + q.id + " · " + esc(q.oblast) + " " + srcBadge(q) + "</div>" +
-        '<div class="tags">' + yesNo(naWebu, "Na webu") + yesNo(q.izvori.length > 0, "U skripti") + "</div>" +
-        '<div class="q">' + esc(q.pitanje) + "</div>" +
-        '<div class="a correct">✓ Tačan odgovor: ' + esc(q.odgovori[q.tacan]) + "</div>" +
-        (q.objasnjenje ? '<div class="e">' + esc(q.objasnjenje) + "</div>" : "") +
-        webEvidenceHtml(q) + evidenceHtml(q) +
-        "</div>";
+    box.innerHTML = hits.slice(0, SEARCH_LIMIT).map(function (q, i) {
+      return '<article class="result-card">' +
+        '<div class="result-meta"><strong class="q-number">#' + q.id + "</strong><span>" + esc(q.oblast) + "</span>" + verifiedChip(q) +
+        '<span class="spacer"></span>' +
+        (isWeb(q) ? '<span class="chip chip-web">' + ICON_CHECK + "Na webu</span>" : '<span class="chip chip-off">Nije na webu</span>') +
+        (q.izvori.length ? '<span class="chip chip-skripta">' + ICON_CHECK + "U skripti</span>" : '<span class="chip chip-off">Nije u skripti</span>') +
+        "</div>" +
+        "<h2>" + highlight(q.pitanje, words) + "</h2>" +
+        '<div class="answer-box">' + ICON_OK + "<div><small>Tačan odgovor</small><strong>" + esc(q.odgovori[q.tacan]) + "</strong>" +
+        (q.objasnjenje ? '<span class="expl">' + esc(q.objasnjenje) + "</span>" : "") + "</div></div>" +
+        evidenceDetails(q, i === 0) +
+        "</article>";
     }).join("");
   }
-  var searchTimer = null;
-  $("search").addEventListener("input", function () {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(runSearch, 200);
-  });
+  function openSearch(text) {
+    if (typeof text === "string") $("search").value = text;
+    show("search");
+    runSearch();
+    $("search").focus();
+  }
 
   // ---------- događaji ----------
-  document.querySelectorAll('input[name="mode"], input[name="izvor"]').forEach(function (el) { el.addEventListener("change", updateModeFields); });
-  ["from", "to"].forEach(function (id) { $(id).addEventListener("input", updateModeFields); });
+  document.querySelectorAll('input[name="mode"], input[name="izvor"], input[name="feedback"]').forEach(function (el) {
+    el.addEventListener("change", updateModeFields);
+  });
+  ["from", "to", "count"].forEach(function (id) { $(id).addEventListener("input", updateModeFields); });
   $("area-list").addEventListener("change", updateModeFields);
   $("only-verified").addEventListener("change", updateModeFields);
   $("areas-all").onclick = function () {
@@ -508,6 +652,28 @@
     updateModeFields();
   };
   $("start-btn").onclick = startFromSetup;
+
+  document.querySelectorAll("[data-nav]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var to = b.getAttribute("data-nav");
+      if (to === "search") { openSearch(); return; }
+      if (to === "exam") { setRadio("mode", "exam"); updateModeFields(); }
+      show("setup");
+      if (to === "exam") document.querySelector(".summary").scrollIntoView({ block: "start" });
+    });
+  });
+  $("quick-search").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { openSearch(this.value); this.value = ""; }
+  });
+
+  $("q-answers").addEventListener("click", function (e) {
+    var b = e.target.closest(".answer");
+    if (b && !b.disabled) choose(parseInt(b.getAttribute("data-orig"), 10));
+  });
+  $("q-grid").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (b) { session.idx = parseInt(b.getAttribute("data-idx"), 10); renderQuestion(); }
+  });
   $("prev-btn").onclick = function () { if (session.idx > 0) { session.idx--; renderQuestion(); } };
   $("next-btn").onclick = next;
   $("finish-btn").onclick = confirmFinish;
@@ -515,15 +681,46 @@
     if (confirm("Prekinuti kviz bez rezultata?")) { stopTimer(); renderSetup(); show("setup"); }
   };
   $("home-btn").onclick = function () { renderSetup(); show("setup"); };
-  $("only-wrong").onchange = renderReview;
+  $("new-exam-btn").onclick = function () { renderSetup(); setRadio("mode", "exam"); updateModeFields(); startFromSetup(); };
+  $("rv-all").onclick = function () { reviewOnlyWrong = false; renderReview(); };
+  $("rv-wrong").onclick = function () { reviewOnlyWrong = true; renderReview(); };
+
+  var searchTimer = null;
+  $("search").addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSearch, 200);
+  });
+  $("search-clear").onclick = function () { $("search").value = ""; runSearch(); $("search").focus(); };
+  $("search-oblast").innerHTML += areas().map(function (a) {
+    return '<option value="' + esc(a.name) + '">' + esc(a.name) + "</option>";
+  }).join("");
+  $("search-oblast").addEventListener("change", runSearch);
+  $("search-pills").addEventListener("click", function (e) {
+    var p = e.target.closest(".pill");
+    if (p) { searchIzvor = p.getAttribute("data-sizvor"); runSearch(); }
+  });
+
+  document.addEventListener("click", function (e) {
+    var z = e.target.closest("[data-zoom]");
+    if (z) openZoom(z.getAttribute("data-zoom"), z.getAttribute("data-cap"));
+  });
+  $("lb-close").onclick = closeZoom;
+  $("lightbox").addEventListener("click", function (e) { if (e.target === this || e.target.classList.contains("lb-body")) closeZoom(); });
+
   document.addEventListener("keydown", function (e) {
-    if ($("screen-quiz").hidden || e.target.tagName === "INPUT") return;
+    if (!$("lightbox").hidden) { if (e.key === "Escape") closeZoom(); return; }
+    var tag = e.target.tagName;
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+    if ($("screen-quiz").hidden) {
+      if (e.key === "/") { e.preventDefault(); if ($("screen-search").hidden) $("quick-search").focus(); else $("search").focus(); }
+      return;
+    }
     var k = e.key.toUpperCase();
     var pos = LETTERS.indexOf(k);
     if (pos === -1 && /^[1-5]$/.test(k)) pos = parseInt(k, 10) - 1;
     var it = session.items[session.idx];
     if (pos >= 0 && pos < it.order.length) choose(it.order[pos]);
-    else if (e.key === "ArrowRight" || e.key === "Enter") next();
+    else if (e.key === "ArrowRight" || (e.key === "Enter" && tag !== "BUTTON")) next();
     else if (e.key === "ArrowLeft" && session.idx > 0) { session.idx--; renderQuestion(); }
   });
 
@@ -531,4 +728,5 @@
     $("setup-error").textContent = "Baza pitanja nije učitana (provjerite folder data/).";
   }
   renderSetup();
+  show("setup");
 })();
