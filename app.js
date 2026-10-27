@@ -7,6 +7,17 @@
   var EXAM_PASS = 28;
   var EXAM_SECONDS = 60 * 60;
   var STORE_KEY = "kviz-ioz-fbih-v1";
+  var SKRIPTA_OBLAST = "Pitanja s ispita (skripta 2025)";
+
+  // Dokazi iz skripti (data/izvori-skripte.js): ključ je tekst pitanja.
+  var DOKUMENTI = window.SKRIPTE_DOKUMENTI || [];
+  var IZVORI = window.IZVORI_SKRIPTE || {};
+  var WEB_DOK = window.WEB_DOKUMENT || null;
+  var IZVORI_WEB = window.IZVORI_WEB || {};
+  ALL.forEach(function (q) {
+    q.izvori = IZVORI[q.pitanje] || [];
+    q.web = IZVORI_WEB[q.pitanje] || null;
+  });
 
   var $ = function (id) { return document.getElementById(id); };
   var session = null;
@@ -43,6 +54,41 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
   }
+  function evidenceHtml(q) {
+    if (!q.izvori.length) return "";
+    var html = '<div class="evidence"><strong>📄 Dokaz iz skripte</strong>';
+    q.izvori.forEach(function (e) {
+      var d = DOKUMENTI[e[0]];
+      var img = encodeURI(d.slike + e[1] + ".jpg");
+      html += '<div class="ev-item">' +
+        "<div><strong>" + esc(d.naziv) + "</strong>, str. " + e[1] +
+        ' · <a href="' + encodeURI(d.pdf) + "#page=" + e[1] + '" target="_blank" rel="noopener">otvori PDF</a>' +
+        ' · <a href="' + img + '" target="_blank" rel="noopener">slika u novom prozoru</a></div>' +
+        (e[2] !== q.pitanje ? '<div class="muted">Pitanje u skripti: ' + esc(e[2]) + "</div>" : "") +
+        "<div>Odgovor u skripti: <em>" + esc(e[3]) + "</em></div>" +
+        '<details><summary>Prikaži stranicu</summary><img loading="lazy" src="' + img + '" alt="' +
+        esc(d.naziv) + ", str. " + e[1] + '"></details>' +
+        "</div>";
+    });
+    return html + "</div>";
+  }
+  function webEvidenceHtml(q) {
+    if (!q.web || !WEB_DOK) return "";
+    var page = q.web[0];
+    return '<div class="evidence"><strong>🌐 Dokaz s weba</strong><div class="ev-item">' +
+      "<div><strong>" + esc(WEB_DOK.naziv) + "</strong>, str. " + page +
+      ' · <a href="' + encodeURI(WEB_DOK.pdf) + "#page=" + page + '" target="_blank" rel="noopener">otvori PDF</a>' +
+      ' · <a href="' + WEB_DOK.url + '" target="_blank" rel="noopener">sajt Agencije</a></div>' +
+      '<div class="muted">Pitanje u katalogu: ' + esc(q.web[1]) + "</div>" +
+      (q.oblast.indexOf("Primjer testa") === 0 ? "" :
+        '<div class="muted">Agencija objavljuje samo pitanja, bez odgovora. Odgovor je iz kviza (vidi objašnjenje).</div>') +
+      "</div></div>";
+  }
+  function izvorOk(q, izvor) {
+    if (izvor === "web") return q.oblast !== SKRIPTA_OBLAST;
+    if (izvor === "skripta") return q.izvori.length > 0;
+    return true;
+  }
   function show(screen) {
     ["setup", "quiz", "result"].forEach(function (n) { $("screen-" + n).hidden = n !== screen; });
     window.scrollTo(0, 0);
@@ -78,6 +124,9 @@
   function renderSetup() {
     $("total-count").textContent = ALL.length;
     $("verified-count").textContent = ALL.filter(function (q) { return q.provjereno; }).length;
+    ["sve", "web", "skripta"].forEach(function (iz) {
+      $("cnt-" + iz).textContent = ALL.filter(function (q) { return izvorOk(q, iz); }).length;
+    });
     var store = loadStore();
     var saved = store.settings || {};
     var list = $("area-list");
@@ -94,6 +143,7 @@
 
     $("to").max = $("from").max = ALL.length;
     if (saved.mode) setRadio("mode", saved.mode);
+    if (saved.izvor) setRadio("izvor", saved.izvor);
     if (saved.feedback) setRadio("feedback", saved.feedback);
     if (saved.from) $("from").value = saved.from;
     if (saved.to) $("to").value = Math.min(saved.to, ALL.length);
@@ -139,8 +189,10 @@
     var from = parseInt($("from").value, 10) || 1;
     var to = parseInt($("to").value, 10) || ALL.length;
     var onlyVerified = $("only-verified").checked;
+    var izvor = radioValue("izvor") || "sve";
     return ALL.filter(function (q) {
       if (sel.indexOf(q.oblast) === -1) return false;
+      if (!izvorOk(q, izvor)) return false;
       if (onlyVerified && !q.provjereno) return false;
       if (ignoreRange) return true;
       return q.id >= from && q.id <= to;
@@ -175,7 +227,7 @@
     if (!questions.length) { err.textContent = "Nema pitanja za zadane uslove."; return; }
 
     var settings = {
-      areas: selectedAreas(), mode: mode, from: from, to: to, count: count,
+      areas: selectedAreas(), mode: mode, izvor: radioValue("izvor"), from: from, to: to, count: count,
       feedback: radioValue("feedback"), shuffle: $("shuffle-answers").checked,
       onlyVerified: $("only-verified").checked
     };
@@ -274,6 +326,9 @@
     } else {
       ex.hidden = true;
     }
+    var ev = $("q-evidence");
+    ev.innerHTML = locked ? webEvidenceHtml(q) + evidenceHtml(q) : "";
+    ev.hidden = !ev.innerHTML;
 
     $("prev-btn").disabled = session.idx === 0;
     $("next-btn").textContent = session.idx === total - 1 ? "Završi →" : "Sljedeće →";
@@ -385,13 +440,62 @@
       });
       if (it.chosen === null) html += '<div class="a wrong">Bez odgovora</div>';
       if (q.objasnjenje) html += '<div class="e">' + esc(q.objasnjenje) + "</div>";
-      html += "</div>";
+      html += webEvidenceHtml(q) + evidenceHtml(q) + "</div>";
     });
     $("r-review").innerHTML = html || '<p class="muted">Sve tačno!</p>';
   }
 
+  // ---------- pretraga ----------
+  var SEARCH_LIMIT = 30;
+  function norm(s) {
+    return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
+  }
+  // Odsijeca padežne nastavke da "lisabonski" pronađe i "Lisabonskog", "probni rad" i "probnog rada".
+  function stem(w) {
+    return w.length > 4 ? w.replace(/(ama|ima|om|og|em|ih|im|oj|a|e|i|o|u)$/, "") : w;
+  }
+  ALL.forEach(function (q) {
+    q.traziPitanje = norm(q.pitanje);
+    q.trazi = norm(q.pitanje + " " + q.odgovori.join(" ") + " " + q.izvori.map(function (e) { return e[2]; }).join(" "));
+  });
+  function yesNo(yes, label) {
+    return '<span class="tag ' + (yes ? "tag-yes" : "tag-no") + '">' + label + ": " + (yes ? "DA" : "NE") + "</span>";
+  }
+  function runSearch() {
+    var words = norm($("search").value).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 2; }).map(stem);
+    var info = $("search-info"), box = $("search-results");
+    if (!words.length) { info.textContent = ""; box.innerHTML = ""; return; }
+    var hits = ALL.filter(function (q) {
+      return words.every(function (w) { return q.trazi.indexOf(w) !== -1; });
+    });
+    // prvo pitanja u kojima su sve riječi u samom tekstu pitanja
+    function score(q) {
+      return words.filter(function (w) { return q.traziPitanje.indexOf(w) !== -1; }).length;
+    }
+    hits.sort(function (a, b) { return score(b) - score(a) || a.id - b.id; });
+    info.textContent = hits.length
+      ? "Pronađeno pitanja: " + hits.length + (hits.length > SEARCH_LIMIT ? " (prikazano prvih " + SEARCH_LIMIT + " – suzite pretragu)" : "")
+      : "Nema pitanja s tim riječima.";
+    box.innerHTML = hits.slice(0, SEARCH_LIMIT).map(function (q) {
+      var naWebu = q.oblast !== SKRIPTA_OBLAST;
+      return '<div class="review-item">' +
+        '<div class="muted">#' + q.id + " · " + esc(q.oblast) + " " + srcBadge(q) + "</div>" +
+        '<div class="tags">' + yesNo(naWebu, "Na webu") + yesNo(q.izvori.length > 0, "U skripti") + "</div>" +
+        '<div class="q">' + esc(q.pitanje) + "</div>" +
+        '<div class="a correct">✓ Tačan odgovor: ' + esc(q.odgovori[q.tacan]) + "</div>" +
+        (q.objasnjenje ? '<div class="e">' + esc(q.objasnjenje) + "</div>" : "") +
+        webEvidenceHtml(q) + evidenceHtml(q) +
+        "</div>";
+    }).join("");
+  }
+  var searchTimer = null;
+  $("search").addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSearch, 200);
+  });
+
   // ---------- događaji ----------
-  document.querySelectorAll('input[name="mode"]').forEach(function (el) { el.addEventListener("change", updateModeFields); });
+  document.querySelectorAll('input[name="mode"], input[name="izvor"]').forEach(function (el) { el.addEventListener("change", updateModeFields); });
   ["from", "to"].forEach(function (id) { $(id).addEventListener("input", updateModeFields); });
   $("area-list").addEventListener("change", updateModeFields);
   $("only-verified").addEventListener("change", updateModeFields);

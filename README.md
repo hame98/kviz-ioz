@@ -1,16 +1,18 @@
 # Kviz – Ispit općeg znanja FBiH (demo)
 
 Kviz za učenje za Ispit općeg znanja (IOZ) Agencije za državnu službu FBiH.
-Sadrži sva pitanja iz „Kataloga pitanja – Vodič za polaganje ispita općeg znanja“, raspoređena u šest oblasti, i 42 pitanja iz primjera testa (ukupno 1.109).
+Sadrži sva pitanja iz „Kataloga pitanja – Vodič za polaganje ispita općeg znanja“, raspoređena u šest oblasti, 42 pitanja iz primjera testa i 532 pitanja s ponuđenim odgovorima iz skripte „Pitanja 2025“ (ukupno 1.641).
 
 ## Pokretanje
 Otvorite `index.html` duplim klikom. Ne treba ni internet ni instalacija.
 
 ## Mogućnosti
-- **Redom (od–do):** svako pitanje ima redni broj (#1–#1109). Unesite raspon, npr. 1–20. Na kraju testa dugme „Sljedeći raspon“ nastavlja dalje, a kviz pamti dokle ste stigli.
+- **Redom (od–do):** svako pitanje ima redni broj (#1–#1641; pitanja iz skripte su #1110–#1641). Unesite raspon, npr. 1–20. Na kraju testa dugme „Sljedeći raspon“ nastavlja dalje, a kviz pamti dokle ste stigli.
 - **Nasumično:** zadani broj pitanja, nasumično iz odabranog raspona.
 - **Simulacija ispita:** 42 nasumična pitanja, 60 minuta, prolaz sa 28 tačnih odgovora.
 - **Prikaz odgovora:** odmah nakon svakog pitanja ili tek na kraju testa.
+- **Pretraga:** upišite bilo koju riječ ili dio pitanja (kvačice i padeži nisu bitni). Za svako pronađeno pitanje dobijete tačan odgovor, oznake „Na webu: DA/NE“ i „U skripti: DA/NE“ i dokaze: stranicu u Katalogu Agencije (`web/Katalog pitanja ADS FBiH.pdf`) i/ili skriptu, stranicu i sliku stranice.
+- **Izvor pitanja:** „Sve“ (sva pitanja), „Web“ (Katalog Agencije i primjer testa, #1–#1109) ili „Skripta“ (pitanja koja postoje u skriptama iz foldera `skripte/`). Kad je odgovor prikazan, ispod pitanja stoji dokaz iz skripte: dokument, stranica, pitanje i odgovor kako su napisani u skripti, link na PDF i slika stranice („Prikaži stranicu“).
 - **Filter po oblastima**, miješanje redoslijeda odgovora, pregled svih odgovora s objašnjenjem, „Ponovi samo netačna“.
 - **Status provjere:** uz svako pitanje stoji oznaka „✓ provjereno u izvoru“ ili „⚠ nije provjereno“. Opcija „Samo pitanja provjerena u izvoru“ ograničava kviz na provjerena pitanja.
 - **Tastatura:** A, B, C (ili 1, 2, 3) bira odgovor, strelice ← i → prelaze na prethodno ili sljedeće pitanje.
@@ -34,8 +36,14 @@ Odgovori su upoređeni s tekstovima propisa, član po član. **926 od 1.109 pita
 
 Pitanja označena sa „⚠ nije provjereno“ uglavnom se odnose na propise RS, Brčko distrikta, Zakon o plaćama FBiH i opća pitanja o EU, za koja izvorni tekst nije bio dostupan. Njih posebno provjerite.
 
+### Pitanja iz skripte 2025 (oktobar 2026.)
+Fajl `data/pitanja-7-skripta-2025.js` sadrži 532 pitanja iz skenirane skripte „Pitanja 2025“. Ponuđeni odgovori su onakvi kakvi se pojavljuju na ispitu, a duplikati su uklonjeni. Tačan je odgovor koji je u skripti podebljan. Tekst je dobiven OCR-om, pa su moguće sitne pravopisne greške.
+Sva ova pitanja su označena „⚠ nije provjereno“. U objašnjenju svakog pitanja navedena je strana skripte i, gdje postoji, broj sličnog pitanja u kvizu. Kod 10 pitanja skripta i kviz daju različit tačan odgovor; ta pitanja u objašnjenju imaju oznaku „PAŽNJA“.
+
 ## Struktura
 - `index.html`, `style.css`, `app.js`: aplikacija
-- `data/*.js`: pitanja po oblastima u formatu `[pitanje, [A, B, C], indeks tačnog (0/1/2), objašnjenje, provjereno (1/0)]`
+- `data/izvori-skripte.js`: dokazi iz skripti (dokument, stranica, pitanje i odgovor u skripti) za svako pitanje, a ključ je tekst pitanja. Ako promijenite tekst pitanja u `data/`, promijenite ga i ovdje, inače se dokaz neće prikazati.
+- `skripte/`: skenirane skripte (PDF), a `skripte/stranice/`: slika svake stranice (JPG)
+- `data/*.js`: pitanja po oblastima (`pitanja-7-skripta-2025.js`: pitanja iz skripte) u formatu `[pitanje, [A, B, C], indeks tačnog (0/1/2), objašnjenje, provjereno (1/0)]`
 
 Pitanje ili odgovor možete ispraviti direktno u odgovarajućem fajlu u folderu `data/`.

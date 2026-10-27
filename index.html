@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kviz IOZ FBiH BUBI</title>
+  <title>Kviz IOZ FBiH</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>Kviz – Ispit općeg znanja FBiH BUBI</h1>
-    <span class="badge">BUBI ❤️</span>
+    <h1>Kviz – Ispit općeg znanja FBiH</h1>
   </header>
 
   <main>
@@ -24,6 +23,14 @@
       </div>
 
       <div class="card">
+        <h2>Pretraga</h2>
+        <p class="muted">Upišite bilo koju riječ ili dio pitanja (kvačice nisu bitne). Za svako pronađeno pitanje dobit ćete tačan odgovor, izvor (web / skripta) i dokaz sa stranicom dokumenta.</p>
+        <input type="search" id="search" class="search-input" placeholder="npr. ombudsmen, probni rad, Lisabonski ugovor…" autocomplete="off">
+        <p class="muted" id="search-info"></p>
+        <div id="search-results"></div>
+      </div>
+
+      <div class="card">
         <h2>Oblasti</h2>
         <p class="muted">Ukupno pitanja u bazi: <strong id="total-count">0</strong></p>
         <div id="area-list" class="area-list"></div>
@@ -31,6 +38,13 @@
           <button type="button" class="btn ghost" id="areas-all">Označi sve</button>
           <button type="button" class="btn ghost" id="areas-none">Poništi sve</button>
         </div>
+      </div>
+
+      <div class="card">
+        <h2>Izvor pitanja</h2>
+        <label class="radio"><input type="radio" name="izvor" value="sve" checked> <span>Sve – sva pitanja zajedno (<span id="cnt-sve">0</span>)</span></label>
+        <label class="radio"><input type="radio" name="izvor" value="web"> <span>Web – pitanja iz Kataloga Agencije i primjera testa (<span id="cnt-web">0</span>)</span></label>
+        <label class="radio"><input type="radio" name="izvor" value="skripta"> <span>Skripta – pitanja koja postoje u skriptama, uz dokaz: dokument, stranica i slika stranice (<span id="cnt-skripta">0</span>)</span></label>
       </div>
 
       <div class="card">
@@ -75,6 +89,7 @@
         <h2 id="q-text"></h2>
         <div id="q-answers" class="answers"></div>
         <div id="q-explain" class="explain" hidden></div>
+        <div id="q-evidence" hidden></div>
       </div>
 
       <div class="row nav">
@@ -131,6 +146,8 @@
   <script src="data/pitanja-5-kancelarijsko-poslovanje.js"></script>
   <script src="data/pitanja-6-evropske-integracije.js"></script>
   <script src="data/primjer-testa.js"></script>
+  <script src="data/pitanja-7-skripta-2025.js"></script>
+  <script src="data/izvori-skripte.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

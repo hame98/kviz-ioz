@@ -136,3 +136,20 @@ input[type=number] {
   .topbar h1 { font-size: 1rem; }
   input[type=number] { width: 90px; }
 }
+
+/* dokazi iz skripti */
+.evidence { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: .9rem; }
+.ev-item { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.ev-item a { color: var(--primary); }
+.ev-item details { margin-top: 6px; }
+.ev-item summary { cursor: pointer; color: var(--primary); font-weight: 600; }
+.ev-item img { display: block; max-width: 100%; margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+
+/* pretraga */
+.search-input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 1rem; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.tag { font-size: .78rem; font-weight: 700; border-radius: 4px; padding: 2px 8px; border: 1px solid; }
+.tag-yes { color: var(--ok); background: var(--ok-bg); }
+.tag-no { color: var(--muted); border-color: var(--border); }
+
+[hidden] { display: none !important; }
