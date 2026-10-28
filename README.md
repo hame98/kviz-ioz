@@ -25,7 +25,7 @@ Agencija objavljuje samo pitanja, bez ponuđenih i tačnih odgovora. Ponuđene i
 Kviz služi samo za učenje. Odgovori mogu sadržavati greške ili zastarjele podatke, pa ih provjerite u važećim propisima.
 
 ### Provjera odgovora (septembar 2026.)
-Odgovori su upoređeni s tekstovima propisa, član po član. **926 od 1.109 pitanja** je označeno kao „provjereno u izvoru“, a **52 odgovora su ispravljena**.
+Odgovori su upoređeni s tekstovima propisa, član po član. **926 od 1.109 pitanja** je označeno kao „provjereno u izvoru“ (nakon usklađivanja sa skriptom u oktobru 2026. ukupno ih je 905), a **52 odgovora su ispravljena**.
 
 | Oblast | Provjereno | Glavni izvori |
 |---|---|---|
@@ -42,6 +42,16 @@ Pitanja označena sa „⚠ nije provjereno“ uglavnom se odnose na propise RS,
 ### Pitanja iz skripte 2025 (oktobar 2026.)
 Fajl `data/pitanja-7-skripta-2025.js` sadrži 532 pitanja iz skenirane skripte „Pitanja 2025“. Ponuđeni odgovori su onakvi kakvi se pojavljuju na ispitu, a duplikati su uklonjeni. Tačan je odgovor koji je u skripti podebljan. Tekst je dobiven OCR-om, pa su moguće sitne pravopisne greške.
 Sva ova pitanja su označena „⚠ nije provjereno“. U objašnjenju svakog pitanja navedena je strana skripte i, gdje postoji, broj sličnog pitanja u kvizu. Kod 10 pitanja skripta i kviz daju različit tačan odgovor; ta pitanja u objašnjenju imaju oznaku „PAŽNJA“.
+
+### Ponuđeni odgovori usklađeni sa skriptom (oktobar 2026.)
+Od svih skripti samo „Pitanja 2025“ ima ponuđene odgovore (a, b, c). Ostalih šest skripti (Ustav, Državna uprava, Upravni postupak, Radni odnosi, Kancelarijsko poslovanje, EU integracije) imaju samo kratke odgovore.
+Kod **272 pitanja iz kataloga** (#1–#1067) koja postoje i u skripti „Pitanja 2025“, ponuđeni odgovori su zamijenjeni odgovorima iz skripte. Svaki par je ručno pregledan, a pitanja koja se samo naizgled poklapaju nisu mijenjana. Primjer testa (#1068–#1109) nije mijenjan jer je službeni.
+- **234 pitanja**: tačan odgovor iz skripte znači isto što i raniji, pa je oznaka provjere ostala. U objašnjenju piše i strana skripte.
+- **20 pitanja**: skripta nudi drugi skup odgovora, pa je tačan odgovor druga činjenica. Ta pitanja su označena „nije provjereno“, a u objašnjenju stoji raniji odgovor.
+- **16 pitanja**: skripta i raniji odgovor u kvizu se ne slažu. Ta pitanja preuzimaju odgovor iz skripte, označena su „nije provjereno“, a u objašnjenju stoji „PAŽNJA“ i raniji odgovor.
+- **2 pitanja** (#577 prekovremeni rad u RS, #985 zakonodavna inicijativa u EU): skripta je kao tačno označila pogrešan odgovor, pa je zadržan odgovor prema propisu, uz napomenu.
+
+Kopija podataka prije ove izmjene: `.backup/data-prije-uskladjivanja-2026-10-28/`.
 
 ## Struktura
 - `index.html`, `style.css`, `app.js`: aplikacija
