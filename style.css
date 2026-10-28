@@ -361,22 +361,82 @@ button, input, select { font: inherit; color: inherit; }
 .lb-body img { max-width: min(900px, 100%); height: auto; align-self: flex-start; border-radius: 8px; background: #FFFFFF; }
 
 /* ---------- mobilno ---------- */
+/* ---------- dokazi na mobitelu: dugme na dnu i panel odozdo ---------- */
+.ev-btn, .show-sm { display: none; }
+.ev-badge:empty { display: none; }
+.ev-badge { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: var(--surface-2); color: var(--text); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+.link-btn { margin-top: 8px; padding: 6px 0; min-height: 36px; border: 0; background: none; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+body.sheet-open { overflow: hidden; }
+
+.sheet { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; justify-content: flex-end; }
+.sheet-backdrop { position: absolute; inset: 0; background: rgba(9, 12, 20, .55); animation: sheet-fade .2s ease-out; }
+.sheet-panel {
+  position: relative; max-height: 88vh; display: flex; flex-direction: column;
+  background: var(--bg); border-radius: 20px 20px 0 0; box-shadow: 0 -8px 32px rgba(9, 12, 20, .25);
+  transition: transform .2s ease-out; animation: sheet-up .25s ease-out;
+  width: 100%; max-width: 720px; margin: 0 auto;
+}
+.sheet-grab { padding: 8px 16px 12px; background: var(--surface); border-radius: 20px 20px 0 0; border-bottom: 1px solid var(--border); touch-action: none; cursor: grab; }
+.sheet-handle { display: block; width: 44px; height: 5px; border-radius: 99px; background: var(--border-strong); margin: 0 auto 10px; }
+.sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sheet-head h2 { font-size: 17px; }
+.sheet-head p { margin: 2px 0 0; }
+.sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
+.sheet-warn { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px; background: var(--warn-bg); color: var(--warn-text); }
+.sheet-warn span { font-size: 14px; }
+.sheet-warn .btn { align-self: flex-start; }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet-panel, .sheet-backdrop { animation: none; transition: none; } }
+
+.ev-card-large { flex-direction: column; }
+.ev-page { position: relative; display: block; width: 100%; padding: 0; margin-top: 4px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #FFFFFF; cursor: zoom-in; }
+.ev-page img { display: block; width: 100%; height: auto; }
+.ev-page-hint { position: absolute; right: 8px; bottom: 8px; font-size: 12px; font-weight: 700; color: #FFFFFF; background: rgba(15, 23, 42, .75); border-radius: 99px; padding: 4px 10px; }
+
+/* ---------- mobilno ---------- */
 @media (max-width: 700px) {
   .wrap { padding-left: 16px; padding-right: 16px; }
   .screen { padding-top: 20px; }
   .hero h1 { font-size: 28px; }
   .page-head h1 { font-size: 26px; }
   .summary { position: static; }
-  .question-card { padding: 20px; }
-  .q-text { font-size: 20px; }
-  .answer { font-size: 15px; min-height: 56px; }
   .kbd-hint, .quicksearch kbd { display: none; }
-  .testbar-in { gap: 10px 12px; }
-  .testprogress { order: 3; flex-basis: 100%; }
-  #finish-btn { margin-left: auto; }
-  .quiz-nav { position: sticky; bottom: 0; z-index: 5; background: var(--bg); padding: 10px 0 14px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; border-top: 1px solid var(--border); }
-  .quiz-nav .btn { flex: 1; }
-  .quiz-nav #next-btn { flex: 2; }
+  .hide-sm { display: none; }
+  .show-sm { display: block; }
+  .sr-only.show-sm { display: inline; }
+
+  /* traka testa u jednom redu */
+  .testbar-in { flex-wrap: nowrap; gap: 10px; padding-top: 10px; padding-bottom: 10px; }
+  .testbar .btn-sm { min-width: 44px; padding: 0 12px; }
+  .testprogress { flex: 1 1 auto; }
+  .testprogress-row { font-size: 12px; }
+  .timer { padding: 0 10px; font-size: 14px; }
+
+  .quiz-layout { padding-top: 16px; gap: 16px; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .question-card { padding: 18px; border-radius: 16px; }
+  .q-text { font-size: 19px; margin-bottom: 16px; }
+  .answer { font-size: 15px; min-height: 56px; padding: 10px 12px; gap: 12px; }
+  .feedback { margin-top: 14px; }
+  .evidence-panel { display: none; }
+
+  /* donja traka: nazad · dokazi · naprijed, uvijek na dohvat palca */
+  .quiz-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: 52px 1fr 1.3fr; gap: 8px;
+    margin: 0; padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -4px 16px rgba(15, 23, 42, .06);
+  }
+  .quiz-nav .btn { min-height: 52px; padding: 0 10px; }
+  #prev-btn { padding: 0; }
+  .ev-btn { display: inline-flex; }
+  .ev-btn.ready { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .ev-btn.ready .ev-badge { background: var(--accent); color: var(--on-accent); }
+  .ev-btn:disabled { opacity: .45; }
+
+  .lb-bar { padding: 10px 12px; }
+  .lb-body { padding: 0; }
+  .lb-body img { max-width: none; width: 100%; border-radius: 0; }
+
   .area-bar { grid-template-columns: 1fr 56px; }
   .area-bar .track { grid-column: 1 / -1; grid-row: 2; }
   .ev-grid { grid-template-columns: 1fr; }

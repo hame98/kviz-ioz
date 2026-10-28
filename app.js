@@ -26,6 +26,7 @@
   var reviewOnlyWrong = false;
   var searchIzvor = "sve";
   var lastFocus = null;
+  var zoomFocus = null;
 
   // ---------- pohrana (per-browser, opcionalno) ----------
   function loadStore() {
@@ -96,20 +97,24 @@
       '<a class="btn" href="' + WEB_DOK.url + '" target="_blank" rel="noopener">Sajt Agencije</a>' +
       "</div></div></section>";
   }
-  function scriptCards(q) {
+  // large: panel na mobitelu – stranica skripte preko cijele širine umjesto sličice.
+  function scriptCards(q, large) {
     return q.izvori.map(function (e) {
       var d = DOKUMENTI[e[0]];
       var img = encodeURI(d.slike + e[1] + ".jpg");
       var cap = d.naziv + ", str. " + e[1];
-      return '<section class="ev-card">' +
-        '<button type="button" class="ev-thumb" data-zoom="' + img + '" data-cap="' + esc(cap) + '" aria-label="Uvećaj stranicu: ' + esc(cap) + '">' +
-        '<img loading="lazy" src="' + img + '" alt=""></button>' +
+      var zoom = 'data-zoom="' + img + '" data-cap="' + esc(cap) + '"';
+      return '<section class="ev-card' + (large ? " ev-card-large" : "") + '">' +
+        (large ? "" : '<button type="button" class="ev-thumb" ' + zoom + ' aria-label="Uvećaj stranicu: ' + esc(cap) + '">' +
+          '<img loading="lazy" src="' + img + '" alt=""></button>') +
         '<div class="ev-body">' +
         '<div class="ev-head"><span class="badge badge-skripta">SKRIPTA</span><span class="ev-title">' + esc(d.naziv) + " · str. " + e[1] + "</span></div>" +
         (e[2] !== q.pitanje ? "<p>Pitanje u skripti: " + esc(e[2]) + "</p>" : "") +
         '<p class="ev-answer">Odgovor u skripti: <strong>' + esc(e[3]) + "</strong></p>" +
+        (large ? '<button type="button" class="ev-page" ' + zoom + ' aria-label="Uvećaj stranicu: ' + esc(cap) + '">' +
+          '<img loading="lazy" src="' + img + '" alt=""><span class="ev-page-hint">Dodirni za uvećanje</span></button>' : "") +
         '<div class="ev-actions">' +
-        '<button type="button" class="btn" data-zoom="' + img + '" data-cap="' + esc(cap) + '">Uvećaj stranicu</button>' +
+        (large ? "" : '<button type="button" class="btn" ' + zoom + ">Uvećaj stranicu</button>") +
         '<a class="btn" href="' + encodeURI(d.pdf) + "#page=" + e[1] + '" target="_blank" rel="noopener">Otvori PDF</a>' +
         "</div></div></section>";
     }).join("");
@@ -121,9 +126,47 @@
       '<div class="ev-grid">' + webCard(q) + scriptCards(q) + "</div></details>";
   }
 
+  // ---------- dokazi na mobitelu (panel odozdo) ----------
+  function sheetOpen() { return !$("sheet").hidden; }
+  function openSheet() {
+    if (!session) return;
+    lastFocus = document.activeElement;
+    renderSheet();
+    $("sheet").hidden = false;
+    document.body.classList.add("sheet-open");
+    $("sheet-panel").style.transform = "";
+    $("sheet-body").scrollTop = 0;
+    $("sheet").querySelector(".sheet-head [data-close-sheet]").focus();
+  }
+  function closeSheet() {
+    $("sheet").hidden = true;
+    document.body.classList.remove("sheet-open");
+    if (lastFocus && document.body.contains(lastFocus)) lastFocus.focus();
+  }
+  function renderSheet() {
+    var it = session.items[session.idx];
+    var q = it.q;
+    var instant = session.opts.feedback === "instant";
+    var answered = instant && it.chosen !== null;
+    var n = evidenceCount(q);
+    $("sheet-sub").textContent = "Pitanje " + (session.idx + 1) + " · #" + q.id + (n ? " · " + n + (n === 1 ? " izvor" : " izvora") : "");
+    var body = $("sheet-body");
+    if (!n) {
+      body.innerHTML = '<div class="ev-placeholder">Za ovo pitanje nema dokaza iz kataloga ni iz skripti.</div>';
+    } else if (!instant) {
+      body.innerHTML = '<div class="ev-placeholder">U ovom testu se odgovori prikazuju na kraju, pa su i dokazi dostupni u pregledu odgovora, na kraju testa.</div>';
+    } else if (!answered && !it.revealed) {
+      body.innerHTML = '<div class="sheet-warn"><strong>Dokaz otkriva tačan odgovor.</strong>' +
+        "<span>Odgovorite prvo na pitanje, ili pogledajte dokaz odmah ako učite uz skriptu.</span>" +
+        '<button type="button" class="btn btn-primary" id="sheet-reveal">Prikaži dokaz</button></div>';
+    } else {
+      body.innerHTML = webCard(q) + scriptCards(q, true);
+    }
+  }
+
   // ---------- uvećana stranica ----------
   function openZoom(src, cap) {
-    lastFocus = document.activeElement;
+    zoomFocus = document.activeElement;
     $("lb-img").src = src;
     $("lb-img").alt = cap;
     $("lb-cap").textContent = cap;
@@ -134,13 +177,14 @@
   function closeZoom() {
     $("lightbox").hidden = true;
     $("lb-img").src = "";
-    if (lastFocus) lastFocus.focus();
+    if (zoomFocus) zoomFocus.focus();
   }
 
   // ---------- ekrani ----------
   function show(screen) {
     ["setup", "search", "quiz", "result"].forEach(function (n) { $("screen-" + n).hidden = n !== screen; });
     $("topbar").hidden = screen === "quiz";
+    if (screen !== "quiz" && sheetOpen()) closeSheet();
     updateNav(screen);
     window.scrollTo(0, 0);
   }
@@ -390,7 +434,9 @@
       ex.className = "feedback " + (good ? "ok" : "bad");
       ex.innerHTML = (good ? ICON_OK : ICON_X) + "<div><strong>" +
         (good ? "Tačno!" : "Netačno – tačan odgovor je " + LETTERS[correctPos]) + "</strong>" +
-        (q.objasnjenje ? "<span>" + esc(q.objasnjenje) + "</span>" : "") + "</div>";
+        (q.objasnjenje ? "<span>" + esc(q.objasnjenje) + "</span>" : "") +
+        (evidenceCount(q) ? '<button type="button" class="link-btn show-sm" data-open-sheet>Pogledaj dokaz (' + evidenceCount(q) + ") ›</button>" : "") +
+        "</div>";
     } else {
       ex.hidden = true;
     }
@@ -408,6 +454,13 @@
     } else {
       ev.innerHTML = '<div class="ev-placeholder">Dokazi se prikazuju u pregledu odgovora, na kraju testa.</div>';
     }
+
+    var evb = $("ev-btn");
+    $("ev-badge").textContent = n || "";
+    evb.disabled = !n;
+    evb.classList.toggle("ready", locked && n > 0);
+    evb.setAttribute("aria-label", n ? "Dokazi (" + n + ")" + (locked ? "" : ", otkrivaju tačan odgovor") : "Nema dokaza za ovo pitanje");
+    if (sheetOpen()) renderSheet();
 
     $("prev-btn").disabled = session.idx === 0;
     $("next-btn").textContent = session.idx === total - 1 ? "Završi test" : "Sljedeće";
@@ -704,11 +757,36 @@
     var z = e.target.closest("[data-zoom]");
     if (z) openZoom(z.getAttribute("data-zoom"), z.getAttribute("data-cap"));
   });
+  $("ev-btn").onclick = openSheet;
+  document.addEventListener("click", function (e) {
+    if (e.target.closest("[data-open-sheet]")) openSheet();
+    else if (e.target.closest("[data-close-sheet]")) closeSheet();
+    else if (e.target.id === "sheet-reveal") {
+      session.items[session.idx].revealed = true;
+      renderSheet();
+    }
+  });
+  // Povlačenje panela prema dolje zatvara ga.
+  (function () {
+    var startY = null, dy = 0, panel = $("sheet-panel");
+    $("sheet-grab").addEventListener("touchstart", function (e) { startY = e.touches[0].clientY; dy = 0; panel.style.transition = "none"; }, { passive: true });
+    $("sheet-grab").addEventListener("touchmove", function (e) {
+      if (startY === null) return;
+      dy = Math.max(0, e.touches[0].clientY - startY);
+      panel.style.transform = "translateY(" + dy + "px)";
+    }, { passive: true });
+    $("sheet-grab").addEventListener("touchend", function () {
+      panel.style.transition = "";
+      if (dy > 90) closeSheet(); else panel.style.transform = "";
+      startY = null;
+    });
+  })();
   $("lb-close").onclick = closeZoom;
   $("lightbox").addEventListener("click", function (e) { if (e.target === this || e.target.classList.contains("lb-body")) closeZoom(); });
 
   document.addEventListener("keydown", function (e) {
     if (!$("lightbox").hidden) { if (e.key === "Escape") closeZoom(); return; }
+    if (sheetOpen()) { if (e.key === "Escape") closeSheet(); return; }
     var tag = e.target.tagName;
     if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
     if ($("screen-quiz").hidden) {

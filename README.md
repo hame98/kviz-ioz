@@ -7,7 +7,9 @@ Sadrži sva pitanja iz „Kataloga pitanja – Vodič za polaganje ispita općeg
 Otvorite `index.html` duplim klikom. Ne treba ni internet ni instalacija.
 
 ## Izgled
-Gore je meni s ekranima **Učenje** (postavke testa u 4 koraka i stalno vidljiv sažetak), **Pretraga** i **Simulacija ispita**, te polje za brzu pretragu (tipka `/`). Tokom testa desno je panel „Izvori i dokazi“, a slika stranice skripte se uvećava klikom. Interfejs prati svijetlu ili tamnu temu sistema i prilagođen je mobitelu.
+Gore je meni s ekranima **Učenje** (postavke testa u 4 koraka i stalno vidljiv sažetak), **Pretraga** i **Simulacija ispita**, te polje za brzu pretragu (tipka `/`). Tokom testa desno je panel „Izvori i dokazi“, a slika stranice skripte se uvećava klikom. Interfejs prati svijetlu ili tamnu temu sistema.
+
+**Na mobitelu** je pri dnu ekrana stalna traka: ← · **Dokazi (broj)** · Sljedeće. Dugme „Dokazi“ izvlači panel odozdo s izvorima: stranicom kataloga i stranicama skripti preko cijele širine. Dodir na stranicu je uvećava, a panel se zatvara povlačenjem prema dolje, dugmetom ✕ ili dodirom izvan panela. Prije odgovora panel upozorava da dokaz otkriva tačan odgovor i nudi „Prikaži dokaz“. U simulaciji ispita dokazi su dostupni tek u pregledu na kraju.
 
 ## Mogućnosti
 - **Redom (od–do):** svako pitanje ima redni broj (#1–#1641; pitanja iz skripte su #1110–#1641). Unesite raspon, npr. 1–20. Na kraju testa dugme „Sljedeći raspon“ nastavlja dalje, a kviz pamti dokle ste stigli.
