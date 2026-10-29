@@ -52,7 +52,7 @@
       </div>
 
       <div class="stats" aria-label="Baza pitanja">
-        <div class="stat"><span>Ukupno pitanja</span><strong id="total-count">0</strong></div>
+        <div class="stat"><span>Ukupno pitanja</span><strong id="total-count">0</strong><span class="stat-sub"><span id="unique-count">0</span> bez duplikata</span></div>
         <div class="stat"><span>Provjereno u propisima</span><strong class="ok" id="verified-count">0</strong></div>
         <div class="stat"><span>Ima dokaz u skripti</span><strong id="stat-skripta">0</strong></div>
         <div class="stat"><span>Iz kataloga Agencije (web)</span><strong id="stat-web">0</strong></div>
@@ -80,6 +80,10 @@
                 <span class="choice-count"><span id="cnt-skripta">0</span> pitanja</span>
               </label>
             </fieldset>
+            <label class="check nodup">
+              <input type="checkbox" id="no-dup">
+              <span><strong>Bez duplikata</strong> <span class="muted small">– isto pitanje iz kataloga, primjera testa i skripte prikazuje se samo jednom (prednost: službeni primjer testa, pa skripta s odgovorima s ispita, pa katalog)</span></span>
+            </label>
           </section>
 
           <section class="card">
@@ -139,6 +143,7 @@
           <div class="summary-count"><strong id="sum-count">0</strong><span>pitanja</span></div>
           <dl class="summary-list">
             <dt>Izvor</dt><dd id="sum-izvor"></dd>
+            <dt>Duplikati</dt><dd id="sum-dup"></dd>
             <dt>Oblasti</dt><dd id="sum-oblasti"></dd>
             <dt>Način</dt><dd id="sum-nacin"></dd>
             <dt>Odgovori</dt><dd id="sum-odgovori"></dd>
@@ -173,6 +178,7 @@
           <button type="button" class="pill" data-sizvor="web" aria-pressed="false">Web</button>
           <button type="button" class="pill" data-sizvor="skripta" aria-pressed="false">Skripta</button>
         </div>
+        <button type="button" class="pill" id="search-nodup" aria-pressed="false">Bez duplikata</button>
         <span class="spacer"></span>
         <label class="select-label">Oblast
           <select id="search-oblast"><option value="">Sve oblasti</option></select>
@@ -338,6 +344,7 @@
   <script src="data/primjer-testa.js"></script>
   <script src="data/pitanja-7-skripta-2025.js"></script>
   <script src="data/izvori-skripte.js"></script>
+  <script src="data/duplikati.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

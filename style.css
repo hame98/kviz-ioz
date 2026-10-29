@@ -361,6 +361,12 @@ button, input, select { font: inherit; color: inherit; }
 .lb-body img { max-width: min(900px, 100%); height: auto; align-self: flex-start; border-radius: 8px; background: #FFFFFF; }
 
 /* ---------- mobilno ---------- */
+/* ---------- duplikati ---------- */
+.stat .stat-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.check.nodup { align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
+.check.nodup input { margin-top: 3px; flex-shrink: 0; }
+.same-as { margin: -4px 0 0; font-size: 13px; color: var(--muted); }
+
 /* ---------- dokazi na mobitelu: dugme na dnu i panel odozdo ---------- */
 .ev-btn, .show-sm { display: none; }
 .ev-badge:empty { display: none; }

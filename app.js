@@ -20,11 +20,39 @@
     q.web = IZVORI_WEB[q.pitanje] || null;
   });
 
+  // Grupe istih pitanja (data/duplikati.js): ključ je tekst pitanja, prvo u grupi ima prednost.
+  var byText = {};
+  ALL.forEach(function (q) { (byText[q.pitanje] = byText[q.pitanje] || []).push(q); });
+  (window.DUPLIKATI || []).forEach(function (g, gi) {
+    g.forEach(function (text, rank) {
+      (byText[text] || []).forEach(function (q) { q.grp = gi; q.grpRank = rank; });
+    });
+  });
+  var GROUPS = [];
+  ALL.forEach(function (q) { if (q.grp !== undefined) (GROUPS[q.grp] = GROUPS[q.grp] || []).push(q); });
+  function srcRank(q) { return q.oblast.indexOf("Primjer testa") === 0 ? 0 : q.oblast === SKRIPTA_OBLAST ? 1 : 2; }
+  function srcLabel(q) { return ["primjer testa", "skripta 2025", "katalog"][srcRank(q)]; }
+  function better(a, b) {
+    return a.grpRank - b.grpRank || srcRank(a) - srcRank(b) || a.id - b.id;
+  }
+  // Iz liste zadržava po jedno pitanje iz svake grupe istih pitanja (ono s najvećom prednošću).
+  function dedupe(list) {
+    var best = {};
+    list.forEach(function (q) {
+      if (q.grp !== undefined && (!best[q.grp] || better(q, best[q.grp]) < 0)) best[q.grp] = q;
+    });
+    return list.filter(function (q) { return q.grp === undefined || best[q.grp] === q; });
+  }
+  function sameAs(q) {
+    return q.grp === undefined ? [] : GROUPS[q.grp].filter(function (o) { return o !== q; });
+  }
+
   var $ = function (id) { return document.getElementById(id); };
   var session = null;
   var timerHandle = null;
   var reviewOnlyWrong = false;
   var searchIzvor = "sve";
+  var searchNoDup = false;
   var lastFocus = null;
   var zoomFocus = null;
 
@@ -218,10 +246,10 @@
   function renderSetup() {
     var count = function (iz) { return ALL.filter(function (q) { return izvorOk(q, iz); }).length; };
     $("total-count").textContent = fmt(ALL.length);
+    $("unique-count").textContent = fmt(dedupe(ALL).length);
     $("verified-count").textContent = fmt(ALL.filter(function (q) { return q.provjereno; }).length);
     $("stat-skripta").textContent = fmt(count("skripta"));
     $("stat-web").textContent = fmt(count("web"));
-    ["sve", "web", "skripta"].forEach(function (iz) { $("cnt-" + iz).textContent = fmt(count(iz)); });
 
     var store = loadStore();
     var saved = store.settings || {};
@@ -241,6 +269,7 @@
     if (saved.count) $("count").value = saved.count;
     $("shuffle-answers").checked = !!saved.shuffle;
     $("only-verified").checked = !!saved.onlyVerified;
+    $("no-dup").checked = !!saved.noDup;
 
     var cont = $("continue-btn");
     if (store.lastTo && store.lastTo < ALL.length) {
@@ -278,6 +307,13 @@
     }
     $("range-info").textContent = info;
 
+    var noDup = $("no-dup").checked;
+    ["sve", "web", "skripta"].forEach(function (iz) {
+      var l = ALL.filter(function (q) { return izvorOk(q, iz); });
+      $("cnt-" + iz).textContent = fmt((noDup ? dedupe(l) : l).length);
+    });
+    $("sum-dup").textContent = noDup ? "Sakriveni" : "Uključeni";
+
     var from = $("from").value, to = $("to").value;
     var izvorNames = { sve: "Sve", web: "Web", skripta: "Skripta" };
     $("sum-count").textContent = fmt(n);
@@ -298,13 +334,14 @@
     var to = parseInt($("to").value, 10) || ALL.length;
     var onlyVerified = $("only-verified").checked;
     var izvor = radioValue("izvor") || "sve";
-    return ALL.filter(function (q) {
+    var list = ALL.filter(function (q) {
       if (sel.indexOf(q.oblast) === -1) return false;
       if (!izvorOk(q, izvor)) return false;
       if (onlyVerified && !q.provjereno) return false;
       if (ignoreRange) return true;
       return q.id >= from && q.id <= to;
     });
+    return $("no-dup").checked ? dedupe(list) : list;
   }
 
   function startFromSetup() {
@@ -337,7 +374,7 @@
     var settings = {
       areas: selectedAreas(), mode: mode, izvor: radioValue("izvor"), from: from, to: to, count: count,
       feedback: radioValue("feedback"), shuffle: $("shuffle-answers").checked,
-      onlyVerified: $("only-verified").checked
+      onlyVerified: $("only-verified").checked, noDup: $("no-dup").checked
     };
     saveStore({ settings: settings });
 
@@ -654,6 +691,8 @@
       if (oblast && q.oblast !== oblast) return false;
       return words.every(function (w) { return q.trazi.indexOf(w) !== -1; });
     });
+    if (searchNoDup) base = dedupe(base);
+    $("search-nodup").setAttribute("aria-pressed", String(searchNoDup));
     pills.forEach(function (p) {
       var iz = p.getAttribute("data-sizvor");
       p.textContent = { sve: "Sve", web: "Web", skripta: "Skripta" }[iz] + " · " +
@@ -676,6 +715,9 @@
         (q.izvori.length ? '<span class="chip chip-skripta">' + ICON_CHECK + "U skripti</span>" : '<span class="chip chip-off">Nije u skripti</span>') +
         "</div>" +
         "<h2>" + highlight(q.pitanje, words) + "</h2>" +
+        (sameAs(q).length ? '<p class="same-as">Isto pitanje i kao: ' + sameAs(q).map(function (o) {
+          return "<strong>#" + o.id + "</strong> (" + srcLabel(o) + ")";
+        }).join(", ") + "</p>" : "") +
         '<div class="answer-box">' + ICON_OK + "<div><small>Tačan odgovor</small><strong>" + esc(q.odgovori[q.tacan]) + "</strong>" +
         (q.objasnjenje ? '<span class="expl">' + esc(q.objasnjenje) + "</span>" : "") + "</div></div>" +
         evidenceDetails(q, i === 0) +
@@ -696,6 +738,8 @@
   ["from", "to", "count"].forEach(function (id) { $(id).addEventListener("input", updateModeFields); });
   $("area-list").addEventListener("change", updateModeFields);
   $("only-verified").addEventListener("change", updateModeFields);
+  $("no-dup").addEventListener("change", updateModeFields);
+  $("search-nodup").onclick = function () { searchNoDup = !searchNoDup; runSearch(); };
   $("areas-all").onclick = function () {
     document.querySelectorAll("#area-list input").forEach(function (el) { el.checked = true; });
     updateModeFields();
