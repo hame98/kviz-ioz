@@ -46,6 +46,10 @@ Pitanja označena sa „⚠ nije provjereno“ uglavnom se odnose na propise RS,
 Fajl `data/pitanja-7-skripta-2025.js` sadrži 532 pitanja iz skenirane skripte „Pitanja 2025“. Ponuđeni odgovori su onakvi kakvi se pojavljuju na ispitu, a duplikati su uklonjeni. Tačan je odgovor koji je u skripti podebljan. Tekst je dobiven OCR-om, pa su moguće sitne pravopisne greške.
 Sva ova pitanja su označena „⚠ nije provjereno“. U objašnjenju svakog pitanja navedena je strana skripte i, gdje postoji, broj sličnog pitanja u kvizu. Kod 10 pitanja skripta i kviz daju različit tačan odgovor; ta pitanja u objašnjenju imaju oznaku „PAŽNJA“.
 
+### Novi ponuđeni odgovori po uzoru na skriptu (oktobar 2026.)
+Kod **795 pitanja iz kataloga** koja nemaju ponuđene odgovore iz skripte, netačni odgovori su napisani ponovo, po uzoru na skriptu „Pitanja 2025“. Sva tri odgovora su iste građe i slične dužine, a razlikuju se u jednom bitnom detalju (broj, rok, institucija, uslov). Ranije je tačan odgovor bio najduži u 73% tih pitanja, a sada u 50%, što je blizu skripte (47%) i službenog primjera testa (33%). Položaj tačnog odgovora je ravnomjerno raspoređen na A, B i C.
+Tačni odgovori su zadržani po značenju. Kod 30 pitanja tačan odgovor je malo preformulisan ili skraćen. Kod 19 od njih, gdje je skraćenje veće, puni raniji tekst je dodan u objašnjenje („Potpun odgovor: …“). Oznaka provjere i izvor u objašnjenju su ostali isti.
+
 ### Ponuđeni odgovori usklađeni sa skriptom (oktobar 2026.)
 Od svih skripti samo „Pitanja 2025“ ima ponuđene odgovore (a, b, c). Ostalih šest skripti (Ustav, Državna uprava, Upravni postupak, Radni odnosi, Kancelarijsko poslovanje, EU integracije) imaju samo kratke odgovore.
 Kod **272 pitanja iz kataloga** (#1–#1067) koja postoje i u skripti „Pitanja 2025“, ponuđeni odgovori su zamijenjeni odgovorima iz skripte. Svaki par je ručno pregledan, a pitanja koja se samo naizgled poklapaju nisu mijenjana. Primjer testa (#1068–#1109) nije mijenjan jer je službeni.
